@@ -1,14 +1,29 @@
-# Auf dem Prod-Server laeuft bereits ein Caddy-Reverse-Proxy ALS CONTAINER fuer mehrere
-# Anwendungen. Dieser Stack bringt daher keinen eigenen Caddy mit. Der app-Container wird
-# in das bestehende Caddy-Docker-Netzwerk `proxy` (external) eingehaengt; der bestehende
-# Caddy erreicht die App ueber den Container-Namen `whatsapp-gateway-app:8080`.
-# Heisst das Caddy-Netz auf dem Server anders, hier und an den Services `proxy` anpassen.
-# Den passenden Site-Block fuer den bestehenden Caddy liefert Caddyfile.snippet.
+# whatsapp-gateway — zentraler Stack (EIN Gateway fuer alle Studios)
+#
+# Anders als der Studio-Manager-Stack ist dies bewusst KEIN mandantenfaehiger
+# Stack: Es gibt genau eine Gateway-Instanz, die ueber die phone_number_id alle
+# Studios bedient. Die Ressourcen-Namen sind daher fest (whatsapp-gateway-*) und
+# nicht aus ${APP_NAME} abgeleitet.
+#
+# Caddy liegt NICHT in diesem Compose — auf dem Prod-Server laeuft Caddy als
+# zentraler Reverse-Proxy in einem separaten Stack und routet auf Container-Namen
+# aus dem geteilten "proxy"-Netzwerk (die App ist als whatsapp-gateway-app:8080
+# erreichbar). Heisst das Caddy-Netz anders, hier und an den Services `proxy`
+# anpassen. Den passenden Site-Block liefert Caddyfile.snippet.
+#
+# Voraussetzungen (einmalig auf VPS):
+#   docker network create proxy        # bzw. wird vom Caddy-Stack angelegt
+
+# Expliziter Compose-Project-Name. WICHTIG: ohne diesen Eintrag leitet Compose
+# den Namen aus dem Ordner-Namen ab — der explizite Name haelt Volume- und
+# Netz-Praefixe stabil und unabhaengig vom Checkout-Pfad.
+name: whatsapp-gateway
 
 services:
   app:
-    build: .
     container_name: whatsapp-gateway-app
+    build:
+      context: .
     restart: unless-stopped
     env_file:
       - .env
@@ -18,9 +33,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Kein `ports`-Mapping noetig: Caddy erreicht die App containerintern ueber das
-    # gemeinsame Netzwerk. `expose` dient nur der Dokumentation des Ports.
-    # (Optional zum lokalen Debuggen: `ports: ["127.0.0.1:8080:8080"]`.)
+    # Kein `ports`-Mapping noetig: Caddy erreicht die App containerintern ueber
+    # das gemeinsame `proxy`-Netz. `expose` dient nur der Dokumentation des Ports.
     expose:
       - "8080"
     healthcheck:
@@ -37,11 +51,17 @@ services:
     image: postgres:16-alpine
     container_name: whatsapp-gateway-db
     restart: unless-stopped
+    ports:
+      # Nur lokal auf dem VPS gebunden (127.0.0.1) — fuer Admin-/Debug-Zugriff
+      # per psql, nie oeffentlich. Ueber DB_HOST_PORT in der .env aenderbar,
+      # falls 5432 auf dem Host bereits belegt ist.
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${DB_NAME:-whatsappgateway}
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
+      # Volume-Name ist explizit gesetzt — siehe volumes-Block unten.
       - db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-whatsappgateway}"]
@@ -51,16 +71,20 @@ services:
     networks:
       - default      # DB bleibt privat, nicht im Caddy-Netzwerk
 
-volumes:
-  db_data:
-
 networks:
-  # Privates Stack-Netz (App <-> DB). Wird von Compose automatisch als
-  # `whatsapp-gateway_default` angelegt; die DB bleibt darin privat.
+  # Privates Stack-Netz (App <-> DB). Compose legt es als
+  # `whatsapp-gateway_default` an; die DB bleibt darin privat.
   default:
-  # Bestehendes Netzwerk des Caddy-Containers (von Caddy selbst angelegt, NICHT von
-  # diesem Stack). Muss exakt so heissen wie `docker network ls` es anzeigt
+  # Bestehendes Netzwerk des Caddy-Containers (von Caddy selbst angelegt, NICHT
+  # von diesem Stack). Muss exakt so heissen wie `docker network ls` es anzeigt
   # (z. B. `proxy`). Ermitteln z. B. mit
   # `docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' <caddy-container>`.
   proxy:
     external: true
+
+volumes:
+  # Compose erlaubt keine Variable-Substitution in Volume-Keys. Workaround:
+  # generischer Key `db_data`, aber expliziter `name:` macht den tatsaechlichen
+  # On-Disk-Namen stabil (sonst praefixt Compose ihn mit dem Projektnamen).
+  db_data:
+    name: whatsapp-gateway_pg_data
