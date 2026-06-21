@@ -1,0 +1,66 @@
+# Auf dem Prod-Server laeuft bereits ein Caddy-Reverse-Proxy ALS CONTAINER fuer mehrere
+# Anwendungen. Dieser Stack bringt daher keinen eigenen Caddy mit. Der app-Container wird
+# in das bestehende Caddy-Docker-Netzwerk `proxy` (external) eingehaengt; der bestehende
+# Caddy erreicht die App ueber den Container-Namen `whatsapp-gateway-app:8080`.
+# Heisst das Caddy-Netz auf dem Server anders, hier und an den Services `proxy` anpassen.
+# Den passenden Site-Block fuer den bestehenden Caddy liefert Caddyfile.snippet.
+
+services:
+  app:
+    build: .
+    container_name: whatsapp-gateway-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Innerhalb des Compose-Netzwerks zeigt die DB-URL auf den `db`-Service.
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-whatsappgateway}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Kein `ports`-Mapping noetig: Caddy erreicht die App containerintern ueber das
+    # gemeinsame Netzwerk. `expose` dient nur der Dokumentation des Ports.
+    # (Optional zum lokalen Debuggen: `ports: ["127.0.0.1:8080:8080"]`.)
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - default      # Verbindung zur DB (privates Stack-Netz)
+      - proxy        # Erreichbarkeit durch den bestehenden Caddy
+
+  db:
+    image: postgres:16-alpine
+    container_name: whatsapp-gateway-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-whatsappgateway}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME:-whatsappgateway}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default      # DB bleibt privat, nicht im Caddy-Netzwerk
+
+volumes:
+  db_data:
+
+networks:
+  # Privates Stack-Netz (App <-> DB). Wird von Compose automatisch als
+  # `whatsapp-gateway_default` angelegt; die DB bleibt darin privat.
+  default:
+  # Bestehendes Netzwerk des Caddy-Containers (von Caddy selbst angelegt, NICHT von
+  # diesem Stack). Muss exakt so heissen wie `docker network ls` es anzeigt
+  # (z. B. `proxy`). Ermitteln z. B. mit
+  # `docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' <caddy-container>`.
+  proxy:
+    external: true

@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: whatsapp-gateway
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+# Anwendungsspezifische, externalisierte Konfiguration
+whatsapp:
+  verify-token: ${WHATSAPP_VERIFY_TOKEN}
+  app-secret: ${WHATSAPP_APP_SECRET}
+  graph:
+    api-version: ${WHATSAPP_GRAPH_API_VERSION:v25.0}
+    base-url: ${WHATSAPP_GRAPH_API_BASE_URL:https://graph.facebook.com}
+
+app:
+  admin-api-key: ${ADMIN_API_KEY}
+  encryption:
+    key: ${APP_ENCRYPTION_KEY}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+logging:
+  level:
+    de.nailsbeauty.whatsappgateway: INFO

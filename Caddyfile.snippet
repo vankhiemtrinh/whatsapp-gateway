@@ -1,0 +1,24 @@
+# ──────────────────────────────────────────────────────────────────────────
+# Site-Block fuer den BEREITS LAUFENDEN Caddy-CONTAINER auf dem Prod-Server.
+# In die bestehende Caddy-Konfiguration aufnehmen (z. B. ein neues File im
+# importierten Verzeichnis oder einen Block in der zentralen Caddyfile) und
+# anschliessend neu laden:  docker exec <caddy-container> caddy reload --config /etc/caddy/Caddyfile
+# Domain anpassen.
+#
+# Voraussetzung: Der app-Container haengt im selben Docker-Netzwerk wie Caddy
+# (in der docker-compose.yml fest als `proxy`, external). Caddy loest den Upstream
+# ueber den Container-Namen `whatsapp-gateway-app` auf.
+#
+# WICHTIG: Caddy reicht den Request-Body byte-genau und unveraendert an das
+# Backend weiter — entscheidend, damit die HMAC-SHA256-Signaturpruefung ueber
+# den Raw-Body gueltig bleibt. Deshalb KEIN `encode` (Komprimierung) in diesem
+# Block, keine Body-Manipulation.
+#
+# Hinweis: X-Forwarded-For, X-Forwarded-Proto und Host setzt Caddy bei
+# reverse_proxy bereits automatisch — daher kein expliziter header_up-Block.
+# ──────────────────────────────────────────────────────────────────────────
+
+# ─── WhatsApp Gateway ─────────────────────────────────────────────
+whatsappgateway.trinely.de {
+	reverse_proxy whatsapp-gateway-app:8080
+}
