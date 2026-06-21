@@ -12,6 +12,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -61,21 +64,36 @@ public class WhatsAppClient {
     /**
      * Sendet eine Template-Nachricht ueber die Cloud API.
      *
+     * <p>Sind {@code bodyParams} gesetzt, werden sie als {@code components[0]} vom Typ
+     * {@code body} mit positionsbezogenen Text-Parametern an die Graph API uebergeben
+     * (Reihenfolge muss zur Template-Definition passen). Andernfalls wird das Template
+     * ohne Parameter gesendet.
+     *
      * @param studio       Studio-Konfiguration
      * @param to           Empfaenger-Telefonnummer
      * @param templateName Name des genehmigten Templates
      * @param languageCode Sprachcode des Templates
+     * @param bodyParams   positionsbezogene Body-Parameter ({@code null}/leer = ohne Parameter)
      * @return die von Meta vergebene Message-ID
      * @throws WhatsAppApiException wenn der Graph-API-Aufruf fehlschlaegt
      */
-    public String sendTemplate(StudioConfig studio, String to, String templateName, String languageCode) {
-        var payload = Map.of(
-                "messaging_product", "whatsapp",
-                "to", to,
-                "type", "template",
-                "template", Map.of(
-                        "name", templateName,
-                        "language", Map.of("code", languageCode)));
+    public String sendTemplate(StudioConfig studio, String to, String templateName,
+                               String languageCode, List<String> bodyParams) {
+        var template = new LinkedHashMap<String, Object>();
+        template.put("name", templateName);
+        template.put("language", Map.of("code", languageCode));
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            var parameters = new ArrayList<Map<String, Object>>();
+            for (var param : bodyParams) {
+                parameters.add(Map.of("type", "text", "text", param != null ? param : ""));
+            }
+            template.put("components", List.of(Map.of("type", "body", "parameters", parameters)));
+        }
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", to);
+        payload.put("type", "template");
+        payload.put("template", template);
         var response = post(studio, "/messages", payload);
         return extractMessageId(response);
     }

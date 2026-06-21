@@ -47,15 +47,17 @@ public class MessagingService {
      * @param to           Empfaenger-Telefonnummer
      * @param templateName Name des genehmigten Templates
      * @param languageCode Sprachcode des Templates
+     * @param bodyParams   positionsbezogene Body-Parameter ({@code null}/leer = ohne Parameter)
      * @return Versand-Bestaetigung mit Message-ID
      * @throws de.nailsbeauty.whatsappgateway.exception.NotFoundException     wenn das Studio fehlt
      * @throws ConflictException                                            wenn das Studio inaktiv ist
      * @throws de.nailsbeauty.whatsappgateway.exception.WhatsAppApiException   bei Graph-API-Fehlern
      */
     @Transactional(readOnly = true)
-    public MessageSendResponse sendTemplate(String studioId, String to, String templateName, String languageCode) {
+    public MessageSendResponse sendTemplate(String studioId, String to, String templateName,
+                                            String languageCode, java.util.List<String> bodyParams) {
         var studio = requireActiveStudio(studioId);
-        var messageId = whatsAppClient.sendTemplate(studio, to, templateName, languageCode);
+        var messageId = whatsAppClient.sendTemplate(studio, to, templateName, languageCode, bodyParams);
         log.info("Template-Nachricht gesendet: studioId={}, to={}, template={}, messageId={}",
                 studioId, to, templateName, messageId);
         return new MessageSendResponse(messageId, to);

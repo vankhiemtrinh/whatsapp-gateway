@@ -127,7 +127,7 @@ Admin (Header `X-Admin-Api-Key: <ADMIN_API_KEY>`):
 - `PUT    /api/studios/{studioId}`
 - `DELETE /api/studios/{studioId}`
 - `POST   /api/studios/{studioId}/messages` — `{ "to": "...", "text": "..." }`
-- `POST   /api/studios/{studioId}/messages/template` — `{ "to": "...", "templateName": "...", "languageCode": "de" }`
+- `POST   /api/studios/{studioId}/messages/template` — `{ "to": "...", "templateName": "...", "languageCode": "de", "bodyParams": ["Anna", "16.06.2026", "10:00"] }` (`bodyParams` optional, positionsbezogen zur Template-Definition)
 - `POST   /api/studios/{studioId}/subscribe` — App auf WABA abonnieren
 
 Beispiel: Studio anlegen

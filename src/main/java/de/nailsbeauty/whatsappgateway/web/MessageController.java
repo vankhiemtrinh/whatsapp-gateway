@@ -46,8 +46,8 @@ public class MessageController {
     @PostMapping("/messages/template")
     public MessageSendResponse sendTemplate(@PathVariable String studioId,
                                             @Valid @RequestBody SendTemplateMessageRequest request) {
-        return messagingService.sendTemplate(
-                studioId, request.to(), request.templateName(), request.languageCode());
+        return messagingService.sendTemplate(studioId, request.to(), request.templateName(),
+                request.languageCode(), request.bodyParams());
     }
 
     /**
