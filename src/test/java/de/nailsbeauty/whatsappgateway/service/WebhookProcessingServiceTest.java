@@ -31,12 +31,15 @@ class WebhookProcessingServiceTest {
     @Mock
     private InboundEventService inboundEventService;
 
+    @Mock
+    private BackendForwarder backendForwarder;
+
     private WebhookProcessingService service;
 
     @BeforeEach
     void setUp() {
         service = new WebhookProcessingService(
-                studioConfigRepository, inboundEventService, new ObjectMapper());
+                studioConfigRepository, inboundEventService, backendForwarder, new ObjectMapper());
     }
 
     @Test
@@ -62,6 +65,85 @@ class WebhookProcessingServiceTest {
 
         verify(inboundEventService)
                 .recordIfNew(eq("wamid.ABC"), eq("PN-123"), eq(EventType.MESSAGE), any());
+    }
+
+    @Test
+    void forwardsNewTextMessageToBackend() {
+        var studio = new StudioConfig();
+        studio.setStudioId("studio-1");
+        studio.setPhoneNumberId("PN-123");
+        when(studioConfigRepository.findByPhoneNumberId("PN-123")).thenReturn(Optional.of(studio));
+        when(inboundEventService.recordIfNew(eq("wamid.ABC"), eq("PN-123"),
+                eq(EventType.MESSAGE), any())).thenReturn(true);
+
+        service.process("""
+            {
+              "entry": [{
+                "changes": [{
+                  "value": {
+                    "metadata": { "phone_number_id": "PN-123" },
+                    "messages": [{ "id": "wamid.ABC", "from": "49170", "type": "text",
+                                   "timestamp": "1718900000",
+                                   "text": { "body": "STAMP-XYZ" } }]
+                  }
+                }]
+              }]
+            }
+            """);
+
+        verify(backendForwarder).forwardMessage(
+                eq(studio), eq("49170"), eq("wamid.ABC"), eq("text"), eq("STAMP-XYZ"), eq("1718900000"));
+    }
+
+    @Test
+    void doesNotForwardNonTextMessage() {
+        var studio = new StudioConfig();
+        studio.setStudioId("studio-1");
+        studio.setPhoneNumberId("PN-123");
+        when(studioConfigRepository.findByPhoneNumberId("PN-123")).thenReturn(Optional.of(studio));
+        when(inboundEventService.recordIfNew(eq("wamid.IMG"), eq("PN-123"),
+                eq(EventType.MESSAGE), any())).thenReturn(true);
+
+        service.process("""
+            {
+              "entry": [{
+                "changes": [{
+                  "value": {
+                    "metadata": { "phone_number_id": "PN-123" },
+                    "messages": [{ "id": "wamid.IMG", "from": "49170", "type": "image" }]
+                  }
+                }]
+              }]
+            }
+            """);
+
+        verify(backendForwarder, never()).forwardMessage(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void doesNotForwardDuplicateMessage() {
+        var studio = new StudioConfig();
+        studio.setStudioId("studio-1");
+        studio.setPhoneNumberId("PN-123");
+        when(studioConfigRepository.findByPhoneNumberId("PN-123")).thenReturn(Optional.of(studio));
+        when(inboundEventService.recordIfNew(eq("wamid.DUP"), eq("PN-123"),
+                eq(EventType.MESSAGE), any())).thenReturn(false);
+
+        service.process("""
+            {
+              "entry": [{
+                "changes": [{
+                  "value": {
+                    "metadata": { "phone_number_id": "PN-123" },
+                    "messages": [{ "id": "wamid.DUP", "from": "49170", "type": "text",
+                                   "text": { "body": "STAMP-XYZ" } }]
+                  }
+                }]
+              }]
+            }
+            """);
+
+        verify(backendForwarder, never()).forwardMessage(any(), any(), any(), any(), any(), any());
     }
 
     @Test

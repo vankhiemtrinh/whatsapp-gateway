@@ -87,9 +87,27 @@ Lokal: `.env.example` kopieren → `.env` (nicht eingecheckt). Prod: Docker Comp
 ## Datenmodell
 
 - `StudioConfig`: `id`, `studioId` (unique), `wabaId`, `phoneNumberId` (unique, indexiert),
-  `displayPhoneNumber`, `accessToken` (verschlüsselt), `active`, `createdAt`, `updatedAt`.
+  `displayPhoneNumber`, `accessToken` (verschlüsselt), `active`, `backendBaseUrl`,
+  `forwardSecret` (verschlüsselt), `createdAt`, `updatedAt`.
 - `InboundEvent` (Idempotenz/Audit): `id`, `metaId` (unique), `phoneNumberId`, `type`
   (`MESSAGE`/`STATUS`), `payload` (jsonb), `receivedAt`.
+
+## Forwarding eingehender Nachrichten ans Studio-Backend
+
+Pro Studio läuft eine eigene Backend-Instanz. Neu eingegangene **Text-Nachrichten**
+(Stempel-Codes) werden vom `WebhookProcessingService` über den `BackendForwarder` an
+`POST {backendBaseUrl}/api/public/whatsapp/gateway/inbound` weitergeleitet —
+normalisierter JSON-Body (`studioId`, `phoneNumberId`, `from`, `messageId`, `type`,
+`text`, `timestamp`), authentifiziert per Header `X-Gateway-Secret` (== `forwardSecret`
+des Studios, identisch zu `app.whatsapp.gateway.inbound-secret` im Backend).
+
+Regeln (NICHT brechen):
+- Weiterleitung **nur bei neuen** Events (`recordIfNew == true`) → keine Doppel-Stempel
+  bei Meta-Redelivery. Status-Updates werden nicht weitergeleitet.
+- Nur `type == text` wird weitergeleitet (andere Typen werden verbucht, nicht gepusht).
+- **Best-Effort**: Fehler werden geloggt, nicht erneut versucht (Meta retryt nicht mehr,
+  da der Webhook bereits mit `200` quittiert wurde). `forwardSecret` nie loggen.
+- Fehlen `backendBaseUrl`/`forwardSecret`, unterbleibt die Weiterleitung (nur Audit).
 
 ## REST-Endpoints
 

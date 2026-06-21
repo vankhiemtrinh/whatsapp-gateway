@@ -1,11 +1,14 @@
 package de.nailsbeauty.whatsappgateway.config;
 
+import java.time.Duration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Stellt den {@link RestClient} fuer ausgehende Aufrufe an die Meta Graph API bereit.
+ * Stellt die {@link RestClient}-Beans fuer ausgehende Aufrufe bereit — an die Meta
+ * Graph API und an die Studio-Backends (Forwarding).
  */
 @Configuration
 public class RestClientConfig {
@@ -21,5 +24,20 @@ public class RestClientConfig {
     @Bean
     public RestClient whatsAppRestClient() {
         return RestClient.builder().build();
+    }
+
+    /**
+     * Erstellt den {@link RestClient} fuer das Weiterleiten eingehender Events an die
+     * Studio-Backends. Mit knappen Timeouts, damit ein langsames/nicht erreichbares
+     * Backend einen Webhook-Worker-Thread nicht dauerhaft blockiert.
+     *
+     * @return konfigurierter {@link RestClient} mit Connect-/Read-Timeout
+     */
+    @Bean
+    public RestClient backendRestClient() {
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+        return RestClient.builder().requestFactory(factory).build();
     }
 }

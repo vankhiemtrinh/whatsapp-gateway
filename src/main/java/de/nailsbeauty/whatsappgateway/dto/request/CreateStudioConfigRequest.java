@@ -11,6 +11,10 @@ import jakarta.validation.constraints.NotBlank;
  * @param displayPhoneNumber Anzeige-Telefonnummer (optional)
  * @param accessToken        Access-Token des Studios (wird verschluesselt gespeichert)
  * @param active             ob die Konfiguration aktiv ist
+ * @param backendBaseUrl     Basis-URL des Studio-Backends fuer das Forwarding
+ *                           eingehender Nachrichten (optional, ohne Trailing-Slash)
+ * @param forwardSecret      geteiltes Geheimnis fuer den Header {@code X-Gateway-Secret}
+ *                           (optional, wird verschluesselt gespeichert)
  */
 public record CreateStudioConfigRequest(
         @NotBlank String studioId,
@@ -18,6 +22,8 @@ public record CreateStudioConfigRequest(
         @NotBlank String phoneNumberId,
         String displayPhoneNumber,
         @NotBlank String accessToken,
-        boolean active
+        boolean active,
+        String backendBaseUrl,
+        String forwardSecret
 ) {
 }

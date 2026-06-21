@@ -26,6 +26,7 @@ public class WebhookProcessingService {
 
     private final StudioConfigRepository studioConfigRepository;
     private final InboundEventService inboundEventService;
+    private final BackendForwarder backendForwarder;
     private final ObjectMapper objectMapper;
 
     /**
@@ -67,13 +68,15 @@ public class WebhookProcessingService {
             return;
         }
 
-        var studioId = studio.get().getStudioId();
-        processMessages(value.path("messages"), phoneNumberId, studioId);
-        processStatuses(value.path("statuses"), phoneNumberId, studioId);
+        processMessages(value.path("messages"), studio.get());
+        processStatuses(value.path("statuses"), studio.get());
     }
 
-    /** Verbucht eingehende Nachrichten idempotent. */
-    private void processMessages(JsonNode messages, String phoneNumberId, String studioId) {
+    /**
+     * Verbucht eingehende Nachrichten idempotent und leitet neue Text-Nachrichten
+     * an das Studio-Backend weiter.
+     */
+    private void processMessages(JsonNode messages, StudioConfig studio) {
         if (!messages.isArray()) {
             return;
         }
@@ -82,16 +85,24 @@ public class WebhookProcessingService {
             var from = message.path("from").asText("?");
             var type = message.path("type").asText("?");
             var isNew = inboundEventService.recordIfNew(
-                    metaId, phoneNumberId, EventType.MESSAGE, safeJson(message));
-            if (isNew) {
-                log.info("Nachricht empfangen: studioId={}, from={}, type={}, messageId={}",
-                        studioId, from, type, metaId);
+                    metaId, studio.getPhoneNumberId(), EventType.MESSAGE, safeJson(message));
+            if (!isNew) {
+                continue;
+            }
+            log.info("Nachricht empfangen: studioId={}, from={}, type={}, messageId={}",
+                    studio.getStudioId(), from, type, metaId);
+            // Nur Text-Nachrichten sind fuer das Stempel-System relevant — andere
+            // Typen (Bilder/Audio/...) werden verbucht, aber nicht weitergeleitet.
+            if ("text".equals(type)) {
+                var text = message.path("text").path("body").asText(null);
+                var timestamp = message.path("timestamp").asText(null);
+                backendForwarder.forwardMessage(studio, from, metaId, type, text, timestamp);
             }
         }
     }
 
     /** Verbucht Status-Updates (sent/delivered/read/failed) idempotent. */
-    private void processStatuses(JsonNode statuses, String phoneNumberId, String studioId) {
+    private void processStatuses(JsonNode statuses, StudioConfig studio) {
         if (!statuses.isArray()) {
             return;
         }
@@ -99,10 +110,10 @@ public class WebhookProcessingService {
             var metaId = status.path("id").asText(null);
             var statusValue = status.path("status").asText("?");
             var isNew = inboundEventService.recordIfNew(
-                    metaId, phoneNumberId, EventType.STATUS, safeJson(status));
+                    metaId, studio.getPhoneNumberId(), EventType.STATUS, safeJson(status));
             if (isNew) {
                 log.info("Status-Update: studioId={}, status={}, messageId={}",
-                        studioId, statusValue, metaId);
+                        studio.getStudioId(), statusValue, metaId);
             }
         }
     }

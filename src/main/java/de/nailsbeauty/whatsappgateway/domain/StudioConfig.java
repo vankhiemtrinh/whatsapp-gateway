@@ -55,6 +55,26 @@ public class StudioConfig {
     @Column(name = "access_token", nullable = false, columnDefinition = "text")
     private String accessToken;
 
+    /**
+     * Basis-URL der Backend-Instanz dieses Studios (ohne Trailing-Slash), an die
+     * eingehende Nachrichten weitergeleitet werden (z. B.
+     * {@code https://studio-berlin.example.com}). {@code null}/leer = keine
+     * Weiterleitung (nur Audit/Idempotenz im Gateway).
+     */
+    @Column(name = "backend_base_url", length = 255)
+    private String backendBaseUrl;
+
+    /**
+     * Geteiltes Geheimnis fuer den Header {@code X-Gateway-Secret} beim Forwarding
+     * an das Studio-Backend — identisch zu dessen
+     * {@code app.whatsapp.gateway.inbound-secret}. At-rest verschluesselt, nie
+     * loggen/ausliefern.
+     */
+    @ToString.Exclude
+    @Convert(converter = AccessTokenConverter.class)
+    @Column(name = "forward_secret", columnDefinition = "text")
+    private String forwardSecret;
+
     /** Ob die Konfiguration aktiv ist (inaktive Studios senden/empfangen nicht). */
     @Column(name = "active", nullable = false)
     private boolean active = true;

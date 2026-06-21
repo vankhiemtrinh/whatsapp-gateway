@@ -13,6 +13,8 @@ import java.time.Instant;
  * @param phoneNumberId      Phone-Number-ID
  * @param displayPhoneNumber Anzeige-Telefonnummer
  * @param active             Aktiv-Status
+ * @param backendBaseUrl     Basis-URL des Studio-Backends fuer das Forwarding
+ *                           (das Forwarding-Geheimnis wird bewusst nicht ausgeliefert)
  * @param createdAt          Anlagezeitpunkt
  * @param updatedAt          letzter Aenderungszeitpunkt
  */
@@ -23,6 +25,7 @@ public record StudioConfigResponse(
         String phoneNumberId,
         String displayPhoneNumber,
         boolean active,
+        String backendBaseUrl,
         Instant createdAt,
         Instant updatedAt
 ) {

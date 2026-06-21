@@ -142,9 +142,30 @@ curl -X POST http://localhost:8080/api/studios \
         "phoneNumberId": "9876543210",
         "displayPhoneNumber": "+49 30 1234567",
         "accessToken": "EAAB...",
-        "active": true
+        "active": true,
+        "backendBaseUrl": "https://studio-berlin.example.com",
+        "forwardSecret": "shared-secret-mit-dem-backend"
       }'
 ```
+
+## Forwarding eingehender Nachrichten ans Studio-Backend
+
+Pro Studio läuft eine eigene Backend-Instanz. Neu eingegangene **Text-Nachrichten**
+(z. B. Treuekarten-Stempel-Codes) werden an das Backend des Studios weitergeleitet:
+
+- **Ziel**: `POST {backendBaseUrl}/api/public/whatsapp/gateway/inbound`
+- **Body** (normalisiert, flach): `{ "studioId", "phoneNumberId", "from", "messageId",
+  "type", "text", "timestamp" }`
+- **Auth**: Header `X-Gateway-Secret: <forwardSecret>` — muss mit dem
+  `app.whatsapp.gateway.inbound-secret` des Backends übereinstimmen.
+
+Verhalten:
+- Nur **neue** Events werden weitergeleitet (Idempotenz über `InboundEvent.metaId`),
+  nur `type=text`. Status-Updates und andere Typen werden verbucht, nicht gepusht.
+- **Best-Effort**: schlägt der Backend-Aufruf fehl, wird das geloggt, aber nicht
+  wiederholt (Meta retryt nicht, da der Webhook bereits mit `200` quittiert wurde).
+- Ohne `backendBaseUrl`/`forwardSecret` am Studio unterbleibt die Weiterleitung
+  (das Gateway hält dann nur Audit/Idempotenz).
 
 ## Einrichtung im Meta App Dashboard
 
