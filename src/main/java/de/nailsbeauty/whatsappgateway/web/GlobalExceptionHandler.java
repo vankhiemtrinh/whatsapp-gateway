@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.List;
@@ -73,6 +74,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleWhatsAppApi(WhatsAppApiException ex, HttpServletRequest request) {
         log.error("Upstream-Fehler bei der Graph API: {}", ex.getMessage());
         return build(HttpStatus.BAD_GATEWAY, ex.getMessage(), request, null);
+    }
+
+    /**
+     * Behandelt Anfragen auf nicht existierende (statische) Ressourcen (HTTP 404).
+     *
+     * <p>Solche Anfragen stammen typischerweise von Bots/Scannern, die die Domain nach
+     * sensiblen Dateien (z. B. {@code .env}, {@code stripe-keys.json}) absuchen. Sie werden
+     * bewusst nur auf {@code DEBUG}-Ebene ohne Stacktrace protokolliert, damit das Log nicht
+     * mit irrelevanten ERROR-Eintraegen geflutet wird.
+     *
+     * @param ex      die Exception fuer die fehlende Ressource
+     * @param request der HTTP-Request
+     * @return schlanke Fehlerantwort mit Status 404
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex,
+                                                               HttpServletRequest request) {
+        log.debug("Keine Ressource fuer {} {}", request.getMethod(), request.getRequestURI());
+        return build(HttpStatus.NOT_FOUND, "Ressource nicht gefunden", request, null);
     }
 
     /**
