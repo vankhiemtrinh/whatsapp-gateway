@@ -21,6 +21,9 @@
         <java.version>21</java.version>
         <mapstruct.version>1.6.3</mapstruct.version>
         <lombok-mapstruct-binding.version>0.2.0</lombok-mapstruct-binding.version>
+        <!-- springdoc 3.x ist die fuer Spring Boot 4 / Spring Framework 7 / Jackson 3
+             kompatible Linie (2.x gilt fuer Boot 3). -->
+        <springdoc.version>3.0.3</springdoc.version>
     </properties>
 
     <dependencies>
@@ -67,6 +70,15 @@
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct</artifactId>
             <version>${mapstruct.version}</version>
+        </dependency>
+
+        <!-- OpenAPI 3 / Swagger UI: stellt /swagger-ui.html und /v3/api-docs bereit.
+             Pfade liegen ausserhalb von /api/* und sind daher (AdminApiKeyFilter)
+             oeffentlich erreichbar. -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <dependency>
